@@ -185,6 +185,28 @@ class MiniMaxBoundaryTests(unittest.TestCase):
                 self.assertEqual(config["models"], saved["models"])
                 self.assertEqual(json.loads(main_models.read_text()), saved)
 
+    def test_explicit_legacy_custom_models_keep_their_ids(self) -> None:
+        for model_id in ("MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1"):
+            with self.subTest(model=model_id), TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                with patch("lib_agent.Path.home", return_value=root), patch(
+                    "lib_agent.subprocess.run", return_value=subprocess.CompletedProcess(
+                        [], 0, "", ""
+                    )
+                ) as run:
+                    ensure_agent_exists(
+                        "bench-test", model_id, root / "workspace",
+                        base_url="https://api.minimax.io/v1",
+                    )
+                config = json.loads((
+                    root / ".openclaw/agents/bench-test/agent/models.json"
+                ).read_text())
+                self.assertEqual(config["defaultModel"], model_id)
+                self.assertEqual(config["models"]["providers"]["custom"]["models"][0]["id"],
+                                 model_id)
+                cmd = run.call_args_list[-1].args[0]
+                self.assertEqual(cmd[cmd.index("--model") + 1], model_id)
+
     def test_existing_agent_keeps_saved_configuration_and_history(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
