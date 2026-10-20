@@ -38,18 +38,32 @@ VALID_THINKING_LEVELS = ("off", "minimal", "low", "medium", "high", "xhigh", "ad
 
 _MINIMAX_OPENAI_BASE_URLS = {
     "https://api.minimax.io/v1",
+    "https://api.minimax.cn/v1",
     "https://api.minimaxi.com/v1",
 }
 
 _MINIMAX_MODEL_METADATA: dict[str, dict[str, Any]] = {
+    "MiniMax-M3.1-Flash": {
+        "reasoning": True,
+        "input": ["text", "image", "video"],
+        "contextWindow": 1_000_000,
+        "maxTokens": 524_288,
+        "cost": {
+            "input": 0.15,
+            "output": 0.6,
+            "cacheRead": 0.015,
+        },
+    },
     "MiniMax-M3": {
         "reasoning": True,
         "input": ["text", "image", "video"],
         "contextWindow": 1_000_000,
+        # Standard <=512k input estimate; this schema cannot express tiered prices.
+        # Longer inputs cost twice as much; priority adds a further 1.5x.
         "cost": {
-            "input": 0.6,
-            "output": 2.4,
-            "cacheRead": 0.12,
+            "input": 0.3,
+            "output": 1.2,
+            "cacheRead": 0.06,
         },
     },
     "MiniMax-M2.7": {
@@ -80,6 +94,12 @@ def _custom_model_definition(model_id: str, base_url: str) -> dict[str, Any]:
         metadata = _MINIMAX_MODEL_METADATA.get(model_id)
         if metadata:
             definition.update(metadata)
+            if (
+                model_id in ("MiniMax-M3.1-Flash", "MiniMax-M3")
+                and base_url.rstrip("/") != "https://api.minimax.io/v1"
+            ):
+                # International USD prices do not describe regional billing.
+                definition.pop("cost", None)
 
     return definition
 
